@@ -65,6 +65,7 @@
 
 ## ディレクトリ構造
 
+- `.cursor/`: Cursor IDE固有の設定ファイルが保存されます。主にAIチャットの振る舞いを定義するルールファイルが含まれます。
 - `reports/daily/`: 生成されたデイリーレポート（Markdown形式）が保存されます。
 - `reports/weekly/`: 生成されたウィークリーレポート（Markdown形式）が保存されます。
 - `reports/raw/`: Slackから取得した生のメッセージデータ（JSON形式）が保存されます。
