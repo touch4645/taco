@@ -1,0 +1,1 @@
+0 0 * * * /usr/bin/bash /workspace/run_daily_report.sh >> /workspace/reports/daily_report_cron.log 2>&1
