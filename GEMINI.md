@@ -13,9 +13,17 @@
 
 ## ディレクトリ構造
 
-- `reports/`: 生成されたデイリーレポート（Markdown形式）が保存されます。
-- `reports/raw/`: Slackから取得した生のメッセージデータ（JSON形式）が保存されます。
-- `tasks.md`: 最新のタスクリストが保存されます。
+```
+.
+├── .git/
+├── .gitignore
+├── GEMINI.md
+├── README.md
+├── main.py
+├── requirements.txt
+├── run_daily_report.sh
+├── test_main.py
+```
 
 ## デイリーレポート生成手順
 

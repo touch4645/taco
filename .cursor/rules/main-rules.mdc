@@ -1,0 +1,13 @@
+# ディレクトリ構造
+
+```
+.
+├── .git/
+├── .gitignore
+├── GEMINI.md
+├── README.md
+├── main.py
+├── requirements.txt
+├── run_daily_report.sh
+├── test_main.py
+```
