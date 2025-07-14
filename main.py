@@ -55,12 +55,13 @@ def main(target_date_str: str = None):
     """
     load_dotenv()
     slack_token = os.environ.get("SLACK_API_TOKEN")
-    channel_id = os.environ.get("SLACK_CHANNEL_ID")
+    channel_ids_str = os.environ.get("SLACK_CHANNEL_IDS")
 
-    if not slack_token or not channel_id:
-        print("Error: SLACK_API_TOKEN and SLACK_CHANNEL_ID must be set in .env file.", file=sys.stderr)
+    if not slack_token or not channel_ids_str:
+        print("Error: SLACK_API_TOKEN and SLACK_CHANNEL_IDS must be set in .env file.", file=sys.stderr)
         return
 
+    channel_ids = [c.strip() for c in channel_ids_str.split(',')]
     client = WebClient(token=slack_token)
 
     if target_date_str:
@@ -72,21 +73,22 @@ def main(target_date_str: str = None):
     else:
         target_date = datetime.today().date()
 
-    messages = fetch_messages_for_date(client, channel_id, target_date)
-    
-    if messages:
-        # reports/rawディレクトリにJSONファイルを保存
-        output_dir = "reports/raw"
-        os.makedirs(output_dir, exist_ok=True)
+    for channel_id in channel_ids:
+        messages = fetch_messages_for_date(client, channel_id, target_date)
         
-        file_path = os.path.join(output_dir, f"raw_messages_{target_date.strftime('%Y-%m-%d')}.json")
-        
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(messages, f, indent=2, ensure_ascii=False)
-        
-        print(f"Raw messages saved to {file_path}")
-    else:
-        print(f"No messages found for {target_date.strftime('%Y-%m-%d')}. Raw message file was not created.")
+        if messages:
+            # reports/rawディレクトリにJSONファイルを保存
+            output_dir = "reports/raw"
+            os.makedirs(output_dir, exist_ok=True)
+            
+            file_path = os.path.join(output_dir, f"raw_messages_{channel_id}_{target_date.strftime('%Y-%m-%d')}.json")
+            
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(messages, f, indent=2, ensure_ascii=False)
+            
+            print(f"Raw messages for channel {channel_id} saved to {file_path}")
+        else:
+            print(f"No messages found for channel {channel_id} on {target_date.strftime('%Y-%m-%d')}. Raw message file was not created.")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
