@@ -1,79 +1,93 @@
-
 import unittest
-from unittest.mock import MagicMock, patch
-from main import analyze_messages_with_llm, format_tasks_to_markdown, fetch_todays_messages
+from unittest.mock import patch, mock_open, MagicMock
+import os
+import json
+from datetime import datetime
+import sys
+
 from slack_sdk.errors import SlackApiError
 
-class TestTaco(unittest.TestCase):
+# テスト対象のスクリプトをインポート
+from main import main, fetch_messages_for_date
 
-    def test_analyze_messages_with_llm(self):
-        """
-        LLM（シミュレーション）によるメッセージ解析のテスト
-        """
-        mock_messages = [
-            {"text": "【タスク】APIの設計をやる", "ts": "1"},
-            {"text": "来週のMTG、資料作成しなきゃ", "ts": "2"},
-            {"text": "UIのバグ修正、完了しました！", "ts": "3"},
-            {"text": "これはただの雑談です", "ts": "4"},
-            # 「調査」はタスクキーワードにないため、これは除外されるのが正しい
-            {"text": "新しいライブラリの調査、進行中です", "ts": "5"},
-        ]
-
-        # 修正: analyze_messages_with_llm のロジックに合わせた期待値
-        expected_tasks = [
-            {'task': '【タスク】APIの設計をやる', 'status': '未着手', 'genre': '開発'},
-            # 「MTG」が先にマッチするため、ジャンルは「会議」になるのが現在のロジック
-            {'task': '来週のMTG、資料作成しなきゃ', 'status': '未着手', 'genre': '会議'},
-            {'task': 'UIのバグ修正、完了しました！', 'status': '完了', 'genre': '開発'},
-        ]
-
-        result = analyze_messages_with_llm(mock_messages)
-        self.assertEqual(result, expected_tasks)
-
-    def test_format_tasks_to_markdown_no_tasks(self):
-        """
-        タスクが0件の場合のMarkdownフォーマットテスト
-        """
-        result = format_tasks_to_markdown([])
-        self.assertIn("本日のタスクはありませんでした", result)
-
-    def test_format_tasks_to_markdown_with_tasks(self):
-        """
-        タスクがある場合のMarkdownフォーマットテスト
-        """
-        tasks = [
-            {'task': 'API設計', 'status': '未着手', 'genre': '開発'},
-            {'task': 'バグ修正', 'status': '進行中', 'genre': '開発'},
-            {'task': '定例会アジェンダ作成', 'status': '未着手', 'genre': '会議'},
-            {'task': 'ドキュメント翻訳', 'status': '完了', 'genre': '資料作成'},
-        ]
-        
-        markdown = format_tasks_to_markdown(tasks)
-
-        # 期待される内容が含まれているかチェック
-        self.assertIn("📝 未着手 (To Do)", markdown)
-        self.assertIn("🚀 進行中 (In Progress)", markdown)
-        self.assertIn("✅ 完了 (Done)", markdown)
-        self.assertIn("### 開発", markdown)
-        self.assertIn("### 会議", markdown)
-        self.assertIn("### 資料作成", markdown)
-        self.assertIn("- [ ] API設計", markdown)
-        self.assertIn("- [ ] バグ修正", markdown) # 進行中もチェックボックスは空
-        self.assertIn("- [ ] 定例会アジェンダ作成", markdown)
-        self.assertIn("- [x] ドキュメント翻訳", markdown) # 完了のみチェック済み
+class TestMain(unittest.TestCase):
 
     @patch('main.WebClient')
-    def test_fetch_todays_messages_error(self, MockWebClient):
+    def test_fetch_messages_for_date_success(self, MockWebClient):
         """
-        Slack APIエラー発生時のメッセージ取得テスト
+        fetch_messages_for_dateが正常にメッセージを取得するかのテスト
         """
-        mock_client = MagicMock()
-        # 修正: 実際のコードが捕捉するSlackApiErrorを発生させる
-        mock_client.conversations_history.side_effect = SlackApiError("An error occurred", MagicMock())
-        
-        # このテストでは、関数が空のリストを返し、クラッシュしないことを確認する
-        result = fetch_todays_messages(mock_client, "C12345")
-        self.assertEqual(result, [])
+        # モックの設定
+        mock_client = MockWebClient.return_value
+        mock_client.conversations_history.return_value = {
+            "messages": [{"text": "hello", "ts": "1", "user": "U1"}]
+        }
+        mock_client.conversations_replies.return_value = {"messages": []}
+        mock_client.users_info.return_value = {"user": {"real_name": "Test User"}}
+
+        # 実行
+        target_date = datetime(2025, 7, 15).date()
+        messages = fetch_messages_for_date(mock_client, "C12345", target_date)
+
+        # 検証
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0]['text'], 'hello')
+        self.assertEqual(messages[0]['user_name'], 'Test User')
+        mock_client.conversations_history.assert_called_once()
+
+    @patch('main.WebClient')
+    def test_fetch_messages_for_date_api_error(self, MockWebClient):
+        """
+        Slack APIエラー時にfetch_messages_for_dateが空のリストを返すかのテスト
+        """
+        # モックの設定
+        mock_client = MockWebClient.return_value
+        mock_client.conversations_history.side_effect = SlackApiError("API Error", MagicMock())
+
+        # 実行
+        target_date = datetime(2025, 7, 15).date()
+        messages = fetch_messages_for_date(mock_client, "C12345", target_date)
+
+        # 検証
+        self.assertEqual(messages, [])
+
+    @patch.dict(os.environ, {
+        "SLACK_API_TOKEN": "test_token",
+        "SLACK_CHANNEL_IDS": "C1, C2"
+    })
+    @patch('main.fetch_messages_for_date')
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('os.makedirs')
+    def test_main_multi_channel_support(self, mock_makedirs, mock_file, mock_fetch):
+        """
+        main関数が複数チャンネルに対応しているかのテスト
+        """
+        # モックの設定
+        mock_fetch.return_value = [{"text": "message"}]
+        target_date_str = "2025-07-15"
+
+        # 実行
+        main(target_date_str)
+
+        # 検証
+        self.assertEqual(mock_fetch.call_count, 2)
+        mock_fetch.assert_any_call(unittest.mock.ANY, "C1", datetime(2025, 7, 15).date())
+        mock_fetch.assert_any_call(unittest.mock.ANY, "C2", datetime(2025, 7, 15).date())
+
+        self.assertEqual(mock_file.call_count, 2)
+        expected_path1 = os.path.join("reports/raw", "raw_messages_C1_2025-07-15.json")
+        expected_path2 = os.path.join("reports/raw", "raw_messages_C2_2025-07-15.json")
+        mock_file.assert_any_call(expected_path1, "w", encoding="utf-8")
+        mock_file.assert_any_call(expected_path2, "w", encoding="utf-8")
+
+    @patch.dict(os.environ, {})
+    @patch('sys.stderr', new_callable=unittest.mock.MagicMock)
+    def test_main_no_env_vars(self, mock_stderr):
+        """
+        環境変数がない場合にmain関数がエラー終了するかのテスト
+        """
+        main()
+        self.assertTrue(mock_stderr.write.called)
 
 if __name__ == '__main__':
     unittest.main()
