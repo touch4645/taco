@@ -1,3 +1,4 @@
+
 import unittest
 from unittest.mock import patch, MagicMock
 from main import main, fetch_messages_for_date
@@ -56,15 +57,29 @@ class TestMain(unittest.TestCase):
         self.assertEqual(collection2.count_documents({}), 1)
 
     @patch('main.WebClient')
-    def test_fetch_messages_for_date_error(self, MockWebClient):
+    def test_fetch_messages_for_date_api_error(self, MockWebClient):
         """
-        Slack APIエラー発生時のメッセージ取得テスト
+        Slack APIエラー時にfetch_messages_for_dateが空のリストを返すかのテスト
         """
+        # モックの設定
         mock_client = MockWebClient.return_value
-        mock_client.conversations_history.side_effect = SlackApiError("An error occurred", MagicMock())
-        
-        result = fetch_messages_for_date(mock_client, "C12345", datetime.today())
-        self.assertEqual(result, [])
+        mock_client.conversations_history.side_effect = SlackApiError("API Error", MagicMock())
+
+        # 実行
+        target_date = datetime(2025, 7, 15).date()
+        messages = fetch_messages_for_date(mock_client, "C12345", target_date)
+
+        # 検証
+        self.assertEqual(messages, [])
+
+    @patch.dict(os.environ, {})
+    @patch('sys.stderr', new_callable=unittest.mock.MagicMock)
+    def test_main_no_env_vars(self, mock_stderr):
+        """
+        環境変数がない場合にmain関数がエラー終了するかのテスト
+        """
+        main()
+        self.assertTrue(mock_stderr.write.called)
 
 if __name__ == '__main__':
     unittest.main()

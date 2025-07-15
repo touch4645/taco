@@ -1,23 +1,23 @@
 #!/bin/bash
 
-# 基準日を設定
-BASE_DATE="2025-07-09"
+# 引数から基準日と取得日数を設定
+# $1: 基準日 (YYYY-MM-DD形式)。指定がなければ今日の日付。
+# $2: 取得日数。指定がなければ7日間。
+BASE_DATE=${1:-$(date -j "+%Y-%m-%d")}
+DAYS_AGO=${2:-7}
 
-# 基準日から過去1週間分の日付をループ (BASE_DATEから6日前まで)
-for i in $(seq 6 -1 0); do
+# DAYS_AGOから1を引いて、seqコマンド用のループ回数を計算
+# (例: 7日間の場合、0から6までループ)
+LOOP_COUNT=$((DAYS_AGO - 1))
+
+# 基準日から過去N日分の日付をループ
+for i in $(seq $LOOP_COUNT -1 0); do
     # BASE_DATEからi日前の日付を計算
     TARGET_DATE=$(date -j -v -${i}d -f "%Y-%m-%d" "${BASE_DATE}" "+%Y-%m-%d")
-    echo "Fetching messages for ${TARGET_DATE} and saving to raw JSON..."
+    echo "Fetching messages for ${TARGET_DATE}..."
 
-    # main.pyを実行し、その出力をJSONファイルに保存
-    OUTPUT_FILE="reports/raw/raw_messages_${TARGET_DATE}.json"
-    .venv/bin/python main.py "${TARGET_DATE}" > "${OUTPUT_FILE}"
-
-    if [ -s "${OUTPUT_FILE}" ]; then
-        echo "Raw messages saved to ${OUTPUT_FILE}"
-    else
-        echo "No messages found for ${TARGET_DATE}. ${OUTPUT_FILE} might be empty or not created."
-    fi
+    # main.pyを実行
+    .venv/bin/python main.py "${TARGET_DATE}"
 done
 
 # tasks.mdの更新は、Gemini CLIがレポート生成時に行うため、ここでは行いません。

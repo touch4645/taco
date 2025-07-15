@@ -1,4 +1,3 @@
-
 import os
 import json
 from datetime import datetime, time, timedelta
@@ -6,6 +5,7 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from dotenv import load_dotenv
 import sys
+from pymongo import MongoClient
 
 def fetch_messages_for_date(client: WebClient, channel_id: str, target_date: datetime) -> list:
     """
@@ -48,8 +48,6 @@ def fetch_messages_for_date(client: WebClient, channel_id: str, target_date: dat
     except SlackApiError as e:
         print(f"Error fetching messages for {target_date.strftime('%Y-%m-%d')}: {e}")
         return []
-
-from pymongo import MongoClient
 
 def main(target_date_str: str = None):
     """
