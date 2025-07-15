@@ -1,4 +1,3 @@
-
 import os
 import json
 from datetime import datetime, time, timedelta
@@ -6,6 +5,7 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from dotenv import load_dotenv
 import sys
+from pymongo import MongoClient
 
 def fetch_messages_for_date(client: WebClient, channel_id: str, target_date: datetime) -> list:
     """
@@ -51,18 +51,22 @@ def fetch_messages_for_date(client: WebClient, channel_id: str, target_date: dat
 
 def main(target_date_str: str = None):
     """
-    メイン処理：Slackからメッセージを取得し、JSON形式でファイルに保存する
+    メイン処理：Slackからメッセージを取得し、MongoDBに保存する
     """
     load_dotenv()
     slack_token = os.environ.get("SLACK_API_TOKEN")
     channel_ids_str = os.environ.get("SLACK_CHANNEL_IDS")
+    mongo_uri = os.environ.get("MONGO_URI")
+    mongo_db_name = os.environ.get("MONGO_DB_NAME")
 
-    if not slack_token or not channel_ids_str:
-        print("Error: SLACK_API_TOKEN and SLACK_CHANNEL_IDS must be set in .env file.", file=sys.stderr)
+    if not all([slack_token, channel_ids_str, mongo_uri, mongo_db_name]):
+        print("Error: SLACK_API_TOKEN, SLACK_CHANNEL_IDS, MONGO_URI, and MONGO_DB_NAME must be set in .env file.", file=sys.stderr)
         return
 
     channel_ids = [c.strip() for c in channel_ids_str.split(',')]
-    client = WebClient(token=slack_token)
+    slack_client = WebClient(token=slack_token)
+    mongo_client = MongoClient(mongo_uri)
+    db = mongo_client[mongo_db_name]
 
     if target_date_str:
         try:
@@ -74,21 +78,25 @@ def main(target_date_str: str = None):
         target_date = datetime.today().date()
 
     for channel_id in channel_ids:
-        messages = fetch_messages_for_date(client, channel_id, target_date)
+        messages = fetch_messages_for_date(slack_client, channel_id, target_date)
         
         if messages:
-            # reports/rawディレクトリにJSONファイルを保存
-            output_dir = "reports/raw"
-            os.makedirs(output_dir, exist_ok=True)
+            collection_name = f"raw_messages_{channel_id}"
+            collection = db[collection_name]
             
-            file_path = os.path.join(output_dir, f"raw_messages_{channel_id}_{target_date.strftime('%Y-%m-%d')}.json")
+            # 日付で既存のドキュメントを検索し、あれば削除
+            collection.delete_many({"date": target_date.strftime('%Y-%m-%d')})
+
+            # 新しいメッセージを挿入
+            document = {
+                "date": target_date.strftime('%Y-%m-%d'),
+                "messages": messages
+            }
+            collection.insert_one(document)
             
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(messages, f, indent=2, ensure_ascii=False)
-            
-            print(f"Raw messages for channel {channel_id} saved to {file_path}")
+            print(f"Raw messages for channel {channel_id} on {target_date.strftime('%Y-%m-%d')} saved to MongoDB.")
         else:
-            print(f"No messages found for channel {channel_id} on {target_date.strftime('%Y-%m-%d')}. Raw message file was not created.")
+            print(f"No messages found for channel {channel_id} on {target_date.strftime('%Y-%m-%d')}. Nothing was saved to MongoDB.")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

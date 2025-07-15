@@ -1,39 +1,60 @@
+
 import unittest
-from unittest.mock import patch, mock_open, MagicMock
-import os
-import json
-from datetime import datetime
-import sys
-
-from slack_sdk.errors import SlackApiError
-
-# テスト対象のスクリプトをインポート
+from unittest.mock import patch, MagicMock
 from main import main, fetch_messages_for_date
+from slack_sdk.errors import SlackApiError
+import mongomock
+import os
+from datetime import datetime
 
 class TestMain(unittest.TestCase):
 
+    def setUp(self):
+        """テストの前に呼ばれるセットアップメソッド"""
+        self.mongo_client = mongomock.MongoClient()
+        self.db = self.mongo_client.taco
+
+    def tearDown(self):
+        """テストの後に呼ばれるクリーンアップメソッド"""
+        self.mongo_client.close()
+
     @patch('main.WebClient')
-    def test_fetch_messages_for_date_success(self, MockWebClient):
+    @patch('main.MongoClient')
+    def test_main_saves_to_mongodb(self, MockMongoClient, MockWebClient):
         """
-        fetch_messages_for_dateが正常にメッセージを取得するかのテスト
+        main関数がMongoDBにデータを正しく保存することをテストする
         """
         # モックの設定
-        mock_client = MockWebClient.return_value
-        mock_client.conversations_history.return_value = {
-            "messages": [{"text": "hello", "ts": "1", "user": "U1"}]
+        MockMongoClient.return_value = self.mongo_client
+        mock_slack_client = MockWebClient.return_value
+        mock_slack_client.conversations_history.return_value = {
+            "messages": [
+                {"text": "Hello from channel 1", "ts": "1", "user": "U1"}
+            ]
         }
-        mock_client.conversations_replies.return_value = {"messages": []}
-        mock_client.users_info.return_value = {"user": {"real_name": "Test User"}}
+        mock_slack_client.conversations_replies.return_value = {"messages": []}
+        mock_slack_client.users_info.return_value = {"user": {"real_name": "Test User"}}
 
-        # 実行
-        target_date = datetime(2025, 7, 15).date()
-        messages = fetch_messages_for_date(mock_client, "C12345", target_date)
+        # 環境変数の設定
+        os.environ['SLACK_API_TOKEN'] = 'test_token'
+        os.environ['SLACK_CHANNEL_IDS'] = 'C123,C456'
+        os.environ['MONGO_URI'] = 'mongodb://localhost:27017/'
+        os.environ['MONGO_DB_NAME'] = 'taco'
+
+        # テスト対象の関数を実行
+        today_str = datetime.today().strftime('%Y-%m-%d')
+        main(today_str)
 
         # 検証
-        self.assertEqual(len(messages), 1)
-        self.assertEqual(messages[0]['text'], 'hello')
-        self.assertEqual(messages[0]['user_name'], 'Test User')
-        mock_client.conversations_history.assert_called_once()
+        collection1 = self.db['raw_messages_C123']
+        self.assertEqual(collection1.count_documents({}), 1)
+        doc1 = collection1.find_one()
+        self.assertEqual(doc1['date'], today_str)
+        self.assertEqual(len(doc1['messages']), 1)
+        self.assertEqual(doc1['messages'][0]['text'], "Hello from channel 1")
+
+        collection2 = self.db['raw_messages_C456']
+        self.assertEqual(collection2.count_documents({}), 1)
 
     @patch('main.WebClient')
     def test_fetch_messages_for_date_api_error(self, MockWebClient):
@@ -50,35 +71,6 @@ class TestMain(unittest.TestCase):
 
         # 検証
         self.assertEqual(messages, [])
-
-    @patch.dict(os.environ, {
-        "SLACK_API_TOKEN": "test_token",
-        "SLACK_CHANNEL_IDS": "C1, C2"
-    })
-    @patch('main.fetch_messages_for_date')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('os.makedirs')
-    def test_main_multi_channel_support(self, mock_makedirs, mock_file, mock_fetch):
-        """
-        main関数が複数チャンネルに対応しているかのテスト
-        """
-        # モックの設定
-        mock_fetch.return_value = [{"text": "message"}]
-        target_date_str = "2025-07-15"
-
-        # 実行
-        main(target_date_str)
-
-        # 検証
-        self.assertEqual(mock_fetch.call_count, 2)
-        mock_fetch.assert_any_call(unittest.mock.ANY, "C1", datetime(2025, 7, 15).date())
-        mock_fetch.assert_any_call(unittest.mock.ANY, "C2", datetime(2025, 7, 15).date())
-
-        self.assertEqual(mock_file.call_count, 2)
-        expected_path1 = os.path.join("reports/raw", "raw_messages_C1_2025-07-15.json")
-        expected_path2 = os.path.join("reports/raw", "raw_messages_C2_2025-07-15.json")
-        mock_file.assert_any_call(expected_path1, "w", encoding="utf-8")
-        mock_file.assert_any_call(expected_path2, "w", encoding="utf-8")
 
     @patch.dict(os.environ, {})
     @patch('sys.stderr', new_callable=unittest.mock.MagicMock)
