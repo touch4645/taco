@@ -1,2 +1,4 @@
 slack_sdk
 python-dotenv
+pymongo
+mongomock
