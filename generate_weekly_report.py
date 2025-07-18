@@ -1,62 +1,45 @@
-# -*- coding: utf-8 -*>
+#!/usr/bin/env python
+"""
+週次レポート生成スクリプト
+"""
 import os
-import datetime
-import argparse
-import io
+import sys
+import logging
+import requests
+from datetime import datetime, timedelta
 
-def get_last_week_daily_reports(daily_report_dir):
+# ロギングの設定
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+def main():
     """
-    指定されたディレクトリから過去7日分のデイリーレポートのパスを取得する
+    週次レポートを生成
     """
-    if not os.path.exists(daily_report_dir):
-        return []
-
-    report_paths = []
-    today = datetime.date.today()
-    for i in range(7):
-        date = today - datetime.timedelta(days=i)
-        file_name = "{}.md".format(date.strftime('%Y-%m-%d'))
-        file_path = os.path.join(daily_report_dir, file_name)
-        if os.path.exists(file_path):
-            report_paths.append(file_path)
-    return report_paths
-
-def generate_weekly_report(daily_dir, weekly_dir):
-    """
-    ウィークリーレポートを生成して保存する
-    """
-    daily_reports = get_last_week_daily_reports(daily_dir)
-    if not daily_reports:
-        print("デイリーレポートが見つかりません。")
-        return
-
-    # デイリーレポートの内容を結合
-    combined_report = ""
-    for report_path in sorted(daily_reports):
-        with io.open(report_path, 'r', encoding='utf-8') as f:
-            combined_report += f.read() + "\n\n"
-
-    # ここでGemini APIを呼び出し、レポートを要約する処理を後で追加する
-
-    # ウィークリーレポートのファイル名を決定
-    today = datetime.date.today()
-    end_date = today - datetime.timedelta(days=1)
-    start_date = end_date - datetime.timedelta(days=6)
-    if not os.path.exists(weekly_dir):
-        os.makedirs(weekly_dir)
-    weekly_report_filename = "{}_{}_weekly.md".format(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-    weekly_report_path = os.path.join(weekly_dir, weekly_report_filename)
-
-    # とりあえず結合したレポートをそのまま保存
-    with io.open(weekly_report_path, 'w', encoding='utf-8') as f:
-        f.write(combined_report)
-
-    print("ウィークリーレポートを {} に保存しました。".format(weekly_report_path))
+    logger.info("週次レポートの生成を開始します...")
+    
+    # APIエンドポイントを呼び出し
+    try:
+        response = requests.post("http://localhost:8000/trigger/weekly-report")
+        response.raise_for_status()
+        
+        result = response.json()
+        logger.info(f"週次レポートの生成が完了しました: {result}")
+        
+        # 結果を表示
+        print(f"週次レポート生成結果:")
+        print(f"状態: {result.get('status')}")
+        print(f"期間: {result.get('week_start')} - {result.get('week_end')}")
+        print(f"完了率: {result.get('completion_rate'):.1f}%")
+        print(f"主要な成果: {result.get('key_achievements')} 件")
+        print(f"ブロッカー: {result.get('blockers')} 件")
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"APIリクエスト中にエラーが発生しました: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="ウィークリーレポートを生成します。")
-    parser.add_argument("--daily_dir", default="reports/daily", help="デイリーレポートが格納されているディレクトリ")
-    parser.add_argument("--weekly_dir", default="reports/weekly", help="ウィークリーレポートを保存するディレクトリ")
-    args = parser.parse_args()
-
-    generate_weekly_report(args.daily_dir, args.weekly_dir)
+    main()
