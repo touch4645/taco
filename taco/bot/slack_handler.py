@@ -235,19 +235,25 @@ class SlackBotHandler:
             # 自然言語クエリを処理
             response = self.query_service.process_natural_language_query(text, context)
             
-            # 返信を送信
+            # スレッドで返信を送信（元のメッセージのタイムスタンプをthread_tsとして使用）
+            thread_ts = message.thread_ts if message.thread_ts else message.timestamp.timestamp()
+            
             self._send_message(
                 channel=message.channel_id,
                 text=response,
-                thread_ts=message.thread_ts
+                thread_ts=str(thread_ts)
             )
             
         except Exception as e:
             logger.error(f"メンション処理中にエラーが発生しました: {str(e)}")
+            
+            # エラーメッセージもスレッドで返信
+            thread_ts = message.thread_ts if message.thread_ts else message.timestamp.timestamp()
+            
             self._send_message(
                 channel=message.channel_id,
-                text=f"メンション処理中にエラーが発生しました: {str(e)}",
-                thread_ts=message.thread_ts
+                text=f"申し訳ありません、処理中にエラーが発生しました。もう一度お試しください。",
+                thread_ts=str(thread_ts)
             )
             
     def _handle_sync_update(self, message: SlackMessage):
