@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: taco-pmo-assistant
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: BACKLOG_SPACE_KEY
+        sync: false
+      - key: BACKLOG_API_KEY
+        sync: false
+      - key: BACKLOG_PROJECT_IDS
+        sync: false
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: SLACK_APP_TOKEN
+        sync: false
+      - key: SLACK_CHANNEL_ID
+        sync: false
+      - key: SLACK_ADMIN_USER_ID
+        sync: false
+      - key: AI_PROVIDER
+        value: gemini
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: gemini-pro
+      - key: TIMEZONE
+        value: Asia/Tokyo
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DATABASE_URL
+        value: sqlite:///taco.db
+      - key: CACHE_TTL_MINUTES
+        value: 30
