@@ -2,7 +2,7 @@
 
 ## Introduction
 
-TACO（Task & Communication Optimizer）は、プロジェクトマネージャーの日常業務を自動化するSlackベースのアシスタントです。進捗管理、報告、催促などのノンコア業務を自動化し、PMがクリエイティブな意思決定業務に集中できる環境を提供します。BacklogとSlackを連携させ、自然言語でのタスク問い合わせにも対応する包括的なPMOソリューションです。
+TACO（Task & Communication Optimizer）は、プロジェクトマネージャーの日常業務を自動化する Slack ベースのアシスタントです。進捗管理、報告、催促などのノンコア業務を自動化し、PM がクリエイティブな意思決定業務に集中できる環境を提供します。Backlog と Slack を連携させ、自然言語でのタスク問い合わせにも対応する包括的な PMO ソリューションです。また、プロジェクト開始時に必要な情報を収集・整理し、プロジェクト Wiki を構築することで、プロジェクトに関する質問に常に答えられる知識ベースを提供します。
 
 ## Requirements
 
@@ -138,3 +138,61 @@ TACO（Task & Communication Optimizer）は、プロジェクトマネージャ�
 4. WHEN handling Slack tokens THEN the system SHALL follow Slack's security best practices
 5. WHEN handling Backlog tokens THEN the system SHALL follow Backlog's API security guidelines
 6. IF credential validation fails THEN the system SHALL provide generic error messages without exposing credential details
+
+### Requir
+
+ement 11
+
+**User Story:** As a project manager, I want TACO to collect and organize project information when first assigned to a project, so that it can build a knowledge base for future reference.
+
+#### Acceptance Criteria
+
+1. WHEN TACO is first added to a project THEN it SHALL initiate a project onboarding process to collect essential information
+2. WHEN collecting project information THEN the system SHALL gather data about team structure, roles, and contact information
+3. WHEN collecting project information THEN the system SHALL gather project charter, goals, timelines, and key milestones
+4. WHEN collecting project information THEN the system SHALL gather project-specific terminology, standards, and guidelines
+5. WHEN collecting information THEN the system SHALL use interactive prompts in Slack to gather data from project stakeholders
+6. WHEN information is collected THEN the system SHALL organize it into a structured project Wiki
+7. IF information is incomplete THEN the system SHALL periodically remind stakeholders about missing information
+
+### Requirement 12
+
+**User Story:** As a project team member, I want to query TACO about project-specific information, so that I can quickly find answers without searching through documentation.
+
+#### Acceptance Criteria
+
+1. WHEN a user asks about project information in Slack THEN the system SHALL respond with relevant information from the project Wiki
+2. WHEN responding to project queries THEN the system SHALL provide source references for the information
+3. WHEN the system cannot find an answer THEN it SHALL suggest who might know the answer based on team roles
+4. WHEN processing project information queries THEN the system SHALL use semantic search to find relevant information
+5. WHEN new information is shared in Slack THEN the system SHALL offer to update the project Wiki
+6. WHEN project information changes THEN the system SHALL keep the Wiki updated with the latest information
+7. IF conflicting information is detected THEN the system SHALL flag it for review by the project manager
+
+### Requirement 13
+
+**User Story:** As a project manager, I want to map Backlog users to Slack users during project setup, so that task notifications and mentions work correctly.
+
+#### Acceptance Criteria
+
+1. WHEN setting up a new project THEN the system SHALL prompt for Backlog-to-Slack user mappings
+2. WHEN collecting user mappings THEN the system SHALL suggest potential matches based on usernames
+3. WHEN user mappings are provided THEN the system SHALL store them in a persistent database
+4. WHEN mentioning users for tasks THEN the system SHALL use the stored mappings to mention the correct Slack users
+5. WHEN a new team member joins THEN the system SHALL detect this and prompt for mapping information
+6. WHEN a user mapping is missing THEN the system SHALL notify the project manager and request the mapping
+7. IF a user has multiple accounts THEN the system SHALL support multiple mappings for the same person
+### Requirement 14
+
+**User Story:** As a project manager, I want to monitor code commits from version control systems and verify they are properly linked to Backlog tickets, so that I can ensure proper project tracking and documentation.
+
+#### Acceptance Criteria
+
+1. WHEN the system runs daily checks THEN it SHALL retrieve commit history from configured version control repositories (BitBucket, GitHub, etc.)
+2. WHEN analyzing commits THEN the system SHALL extract ticket references from commit messages using configurable patterns
+3. WHEN a commit lacks a valid ticket reference THEN the system SHALL flag it for review and notify the team
+4. WHEN commits reference a ticket THEN the system SHALL verify the ticket exists and is in an appropriate status
+5. WHEN commits modify significant files without ticket updates THEN the system SHALL suggest ticket updates
+6. WHEN generating daily reports THEN the system SHALL include commit-to-ticket correlation statistics
+7. WHEN detecting patterns of missing ticket references THEN the system SHALL provide team-specific recommendations
+8. IF version control API authentication fails THEN the system SHALL log the error and notify administrators

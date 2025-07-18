@@ -183,21 +183,64 @@ class QueryService:
         Returns:
             生成された回答
         """
-        # 実際のタスクデータは後で実装するTaskServiceから取得
-        # ここではダミーの回答を返す
-        if intent == QueryIntent.TASKS_DUE_TODAY:
-            return "今日期限のタスクは以下の通りです：\n・タスク1\n・タスク2\n・タスク3"
-        elif intent == QueryIntent.TASKS_DUE_THIS_WEEK:
-            return "今週期限のタスクは以下の通りです：\n・タスク1（今日）\n・タスク2（明日）\n・タスク3（金曜日）"
-        elif intent == QueryIntent.TASKS_OVERDUE:
-            return "期限切れのタスクは以下の通りです：\n・タスク4（3日遅延）\n・タスク5（1週間遅延）"
-        elif intent == QueryIntent.TASKS_BY_ASSIGNEE:
-            user_mentions = ", ".join([f"<@{user}>" for user in context.mentioned_users]) if context.mentioned_users else "指定なし"
-            return f"{user_mentions} の担当タスクは以下の通りです：\n・タスク1\n・タスク2"
-        elif intent == QueryIntent.PROJECT_STATUS:
-            return "プロジェクト全体の状況：\n・完了率: 65%\n・期限切れタスク: 2件\n・今週期限タスク: 5件\n・ブロッカー: 1件"
-        else:
-            return "申し訳ありません、その質問にはお答えできません。別の質問をお試しください。"
+        # TaskServiceを初期化
+        from taco.services.task_service import TaskService
+        task_service = TaskService()
+        
+        try:
+            if intent == QueryIntent.TASKS_DUE_TODAY:
+                # 今日期限のタスクを取得
+                tasks = task_service.get_tasks_due_today()
+                return self.format_task_response(tasks, intent)
+                
+            elif intent == QueryIntent.TASKS_DUE_THIS_WEEK:
+                # 今週期限のタスクを取得
+                tasks = task_service.get_tasks_due_this_week()
+                return self.format_task_response(tasks, intent)
+                
+            elif intent == QueryIntent.TASKS_OVERDUE:
+                # 期限切れのタスクを取得
+                tasks = task_service.get_overdue_tasks()
+                return self.format_task_response(tasks, intent)
+                
+            elif intent == QueryIntent.TASKS_BY_ASSIGNEE:
+                # 特定のユーザーのタスクを取得
+                if context.mentioned_users:
+                    # BacklogユーザーIDとSlackユーザーIDのマッピングが必要
+                    # 簡易的な実装として、すべてのタスクを取得して担当者でフィルタリング
+                    all_tasks = task_service.get_all_tasks()
+                    tasks = []
+                    
+                    # メンションされたユーザーの担当タスクを抽出
+                    # 注: 実際の実装では、SlackユーザーIDからBacklogユーザーIDへの変換が必要
+                    user_mentions = ", ".join([f"<@{user}>" for user in context.mentioned_users])
+                    return f"{user_mentions} の担当タスクは以下の通りです：\n" + \
+                           "（注: SlackユーザーとBacklogユーザーのマッピングが未実装のため、正確な情報ではありません）\n" + \
+                           "・タスク情報を取得するには、Backlogユーザー名で質問してください"
+                else:
+                    return "担当者が指定されていません。@ユーザー名 を含めて質問してください。"
+                    
+            elif intent == QueryIntent.PROJECT_STATUS:
+                # プロジェクト全体の状況を取得
+                overdue_tasks = task_service.get_overdue_tasks()
+                due_today_tasks = task_service.get_tasks_due_today()
+                due_this_week_tasks = task_service.get_tasks_due_this_week()
+                completion_rate = task_service.get_completion_rate()
+                
+                status_text = f"プロジェクト全体の状況：\n"
+                status_text += f"・完了率: {completion_rate:.1f}%\n"
+                status_text += f"・期限切れタスク: {len(overdue_tasks)}件\n"
+                status_text += f"・今日期限タスク: {len(due_today_tasks)}件\n"
+                status_text += f"・今週期限タスク: {len(due_this_week_tasks)}件\n"
+                
+                return status_text
+                
+            else:
+                return "申し訳ありません、その質問にはお答えできません。別の質問をお試しください。"
+                
+        except Exception as e:
+            logger.error(f"構造化応答の生成中にエラーが発生しました: {str(e)}")
+            return f"申し訳ありません、タスク情報の取得中にエラーが発生しました。\nエラー: {str(e)}"
     
     def _generate_ai_response(self, query: str, context: QueryContext) -> str:
         """
